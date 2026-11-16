@@ -10,7 +10,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = '0.6.3'
+from build_version import VERSION
 REPO = 'zoshs1231/PUBG-Drop-Assistant'
 API = 'https://api.github.com/repos/' + REPO + '/releases/latest'
 PACKAGE = 'PUBG_Drop_Assistant-Windows.zip'
