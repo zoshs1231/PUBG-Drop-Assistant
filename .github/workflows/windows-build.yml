@@ -48,11 +48,12 @@ jobs:
         shell: pwsh
         run: |
           python -m PyInstaller --noconfirm --clean --onefile --windowed --name PUBG_Drop_Assistant --collect-all cv2 --collect-all truststore --collect-data certifi app.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name PUBG_Drop_Updater updater.py
 
       - name: Package EXE and checksum
         shell: pwsh
         run: |
-          Compress-Archive -Path dist/PUBG_Drop_Assistant.exe -DestinationPath dist/PUBG_Drop_Assistant-Windows.zip -Force
+          Compress-Archive -Path dist/PUBG_Drop_Assistant.exe,dist/PUBG_Drop_Updater.exe -DestinationPath dist/PUBG_Drop_Assistant-Windows.zip -Force
           $hash = (Get-FileHash dist/PUBG_Drop_Assistant-Windows.zip -Algorithm SHA256).Hash.ToLower()
           Set-Content -Path dist/PUBG_Drop_Assistant-Windows.zip.sha256 -Value $hash -NoNewline -Encoding ascii
 
