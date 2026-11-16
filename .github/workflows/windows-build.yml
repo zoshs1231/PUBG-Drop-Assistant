@@ -43,6 +43,18 @@ jobs:
         shell: pwsh
         run: |
           python -m unittest discover -p 'test_*.py'
+          
+      - name: Inject release version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          if ($version -match '^v\d+\.\d+\.\d+$') {
+            $version = $version.Substring(1)
+          } else {
+            $version = "0.0.0"
+          }
+          Set-Content -Path build_version.py -Value "VERSION = '$version'" -Encoding utf8
+          Write-Host "Embedded application version: $version"
 
       - name: Build EXE
         shell: pwsh
