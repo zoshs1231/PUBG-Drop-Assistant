@@ -1,0 +1,6 @@
+Pillow>=10.0,<13
+opencv-python>=4.8,<5
+numpy>=1.24,<3
+pyinstaller>=6.0,<7
+truststore>=0.10,<1
+certifi>=2024.2.2
