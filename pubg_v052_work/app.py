@@ -11,13 +11,14 @@ from empirical import assess_route, recorded_summary
 from maps import MAPS, PROFILES
 from guidance import make_guidance
 from map_assets import cached_path, read_metadata, update_map
+from app_update import VERSION, check_update, stage_update, start_install
 
 BASE = Path(__file__).resolve().parent
 
 class DropAssistant(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title('PUBG Drop Assistant v0.5 — OFFLINE CALCULATOR')
+        self.title(f'PUBG Drop Assistant v{VERSION} — OFFLINE CALCULATOR')
         self.geometry('1150x790')
         self.minsize(900, 650)
         self.route_start = None
@@ -43,13 +44,15 @@ class DropAssistant(tk.Tk):
         self._load_cached_map()
         self._draw()
         self.after(700, self._offer_initial_download)
+        self.after(2000, self.check_program_update)
 
     def _build(self):
         top = ttk.Frame(self, padding=10)
         top.pack(fill='x')
-        ttk.Label(top, text='PUBG DROP ASSISTANT v0.5 | OFFLINE CALCULATOR', font=('Segoe UI', 13, 'bold')).pack(side='left')
+        ttk.Label(top, text=f'PUBG DROP ASSISTANT v{VERSION} | OFFLINE CALCULATOR', font=('Segoe UI', 13, 'bold')).pack(side='left')
         ttk.Combobox(top, textvariable=self.map_name, values=list(MAPS), width=17, state='readonly').pack(side='left', padx=12)
         self.map_name.trace_add('write', self.on_map_change)
+        ttk.Button(top, text='프로그램 업데이트', command=lambda: self.check_program_update(manual=True)).pack(side='right', padx=4)
         ttk.Button(top, text='수동 이미지', command=self.load_map).pack(side='right', padx=4)
         ttk.Button(top, text='지도 업데이트 확인', command=self.update_selected_map).pack(side='right', padx=4)
         ttk.Button(top, text='설정 불러오기', command=self.load_project).pack(side='right', padx=4)
@@ -263,6 +266,52 @@ class DropAssistant(tk.Tk):
         if messagebox.askyesno('지도 이미지 자동 다운로드',
             '선택한 지도의 로컬 이미지가 없습니다.\nPUBG 공식 API 에셋 저장소에서 다운로드할까요?\n\n인터넷 연결이 필요하며, 공식 에셋도 최신 게임 패치와 다를 수 있습니다.'):
             self.update_selected_map()
+
+    def check_program_update(self, manual=False):
+        if getattr(self, '_checking_update', False):
+            return
+        self._checking_update = True
+        def worker():
+            try:
+                info = check_update()
+                self.after(0, lambda: self._update_check_done(info, manual))
+            except Exception as exc:
+                msg = str(exc)
+                self.after(0, lambda: self._update_check_failed(msg, manual))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_check_failed(self, msg, manual):
+        self._checking_update = False
+        if manual:
+            messagebox.showwarning('프로그램 업데이트 확인 실패', msg)
+
+    def _update_check_done(self, info, manual):
+        self._checking_update = False
+        if not info:
+            if manual:
+                messagebox.showinfo('프로그램 업데이트', '현재 최신 버전이거나 배포된 업데이트가 없습니다.')
+            return
+        notes = info.get('notes', '')[:700]
+        if not messagebox.askyesno('프로그램 업데이트',
+                f'새 버전 {info["version"]}이 있습니다.\n현재 버전: v{VERSION}\n\n{notes}\n\n다운로드하고 설치할까요?'):
+            return
+        self.status.set(f'{info["version"]} 다운로드 및 무결성 확인 중...')
+        def worker():
+            try:
+                new_exe, updater_exe = stage_update(info)
+                self.after(0, lambda: self._install_program_update(new_exe, updater_exe))
+            except Exception as exc:
+                msg = str(exc)
+                self.after(0, lambda: messagebox.showerror('프로그램 업데이트 실패', msg))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _install_program_update(self, new_exe, updater_exe):
+        try:
+            start_install(new_exe, updater_exe)
+        except Exception as exc:
+            messagebox.showerror('프로그램 업데이트 실패', str(exc))
+            return
+        self.destroy()
 
     def update_selected_map(self):
         name = self.map_name.get()
