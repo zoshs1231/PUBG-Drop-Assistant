@@ -29,7 +29,7 @@ MAP_CODES = {
     'Karakin': ('Summerland_Main', 'Karakin'),
     'Haven (legacy)': ('Heaven_Main', 'Haven'),
 }
-MAX_IMAGE_BYTES = 90 * 1024 * 1024
+MAX_IMAGE_BYTES = 512 * 1024 * 1024  # 512 MiB safety cap for high-resolution LFS maps
 
 def cache_root():
     base = os.environ.get('LOCALAPPDATA')
@@ -176,6 +176,8 @@ def update_map(name, root=None, opener=None):
                 if not prefix.startswith(b'\x89PNG\r\n\x1a\n'):
                     raise ValueError(f'PNG가 아닌 서버 응답 (Content-Type: {content_type or "없음"}, 처음 80바이트: {prefix[:80]!r})')
                 with Image.open(temp_name) as img:
+                    if img.width * img.height > 150_000_000:
+                        raise ValueError('지도 이미지 픽셀 제한 초과')
                     img.verify()
                 with Image.open(temp_name) as img:
                     if img.width < 512 or img.height < 512 or abs(img.width-img.height) > max(img.width,img.height)*0.1:
@@ -185,7 +187,11 @@ def update_map(name, root=None, opener=None):
                 failures.append(f'{urllib.parse.urlparse(candidate).hostname}: {exc}')
         else:
             raise RuntimeError('공식 지도 이미지 다운로드에 실패했습니다.\n' + '\n'.join(failures))
-        digest = hashlib.sha256(Path(temp_name).read_bytes()).hexdigest()
+        hasher = hashlib.sha256()
+        with open(temp_name, 'rb') as downloaded:
+            for block in iter(lambda: downloaded.read(1024 * 1024), b''):
+                hasher.update(block)
+        digest = hasher.hexdigest()
         state = 'updated' if target.exists() else 'downloaded'
         os.replace(temp_name, target)
         temp_name = None
